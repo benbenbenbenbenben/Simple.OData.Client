@@ -16,6 +16,7 @@ namespace Simple.OData.Client
         private const string AdapterV4AssemblyName = "Simple.OData.Client.V4.Adapter";
         private const string AdapterV3TypeName = "Simple.OData.Client.V3.Adapter.ODataAdapter";
         private const string AdapterV4TypeName = "Simple.OData.Client.V4.Adapter.ODataAdapter";
+        private static Dictionary<int, IODataAdapter> AdapterCache = new Dictionary<int, IODataAdapter>();
 
         private readonly ISession _session;
 
@@ -54,6 +55,11 @@ namespace Simple.OData.Client
 
         public IODataAdapter ParseMetadata(string metadataDocument)
         {
+            if (AdapterCache.ContainsKey(metadataDocument.GetHashCode()))
+            {
+                return AdapterCache[metadataDocument.GetHashCode()];
+            }
+
             var reader = XmlReader.Create(new StringReader(metadataDocument));
             reader.MoveToContent();
             var protocolVersion = reader.GetAttribute("Version");
@@ -76,11 +82,15 @@ namespace Simple.OData.Client
                     }
                 }
 
-                return LoadAdapter(AdapterV3AssemblyName, AdapterV3TypeName, _session, protocolVersion, metadataDocument);
+                var adapter = LoadAdapter(AdapterV3AssemblyName, AdapterV3TypeName, _session, protocolVersion, metadataDocument);
+                AdapterCache.Add(metadataDocument.GetHashCode(), adapter);
+                return adapter;
             }
             else if (protocolVersion == ODataProtocolVersion.V4)
             {
-                return LoadAdapter(AdapterV4AssemblyName, AdapterV4TypeName, _session, protocolVersion, metadataDocument);
+                var adapter = LoadAdapter(AdapterV4AssemblyName, AdapterV4TypeName, _session, protocolVersion, metadataDocument);
+                AdapterCache.Add(metadataDocument.GetHashCode(), adapter);
+                return adapter;
             }
 
             throw new NotSupportedException(string.Format("OData protocol {0} is not supported", protocolVersion));
